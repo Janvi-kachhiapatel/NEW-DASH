@@ -269,7 +269,7 @@ export default function ReelCreation({
                     !cameraEnabled ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                   }`}
                 >
-                  {cameraEnabled ? <VideoOn size={20} /> : <VideoOff size={20} />}
+                  {cameraEnabled ? <Video size={20} /> : <VideoOff size={20} />}
                 </button>
               </div>
 

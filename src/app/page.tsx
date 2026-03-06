@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { Search, Map, Home, TrendingUp, User, Plus, Filter, Star, Phone, MapPin, Heart, Bookmark, Calendar, BarChart3 } from 'lucide-react';
+import { Search, Map, Home, TrendingUp, User, Plus, Filter, Star, Phone, MapPin, Heart, Bookmark, Calendar, BarChart3, MessageCircle } from 'lucide-react';
 import DirectBooking from '@/components/booking/DirectBooking';
 import PriceComparison from '@/components/comparison/PriceComparison';
 
@@ -276,34 +276,51 @@ export default function ConnectedHomePage() {
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (business.phone) {
+                window.open(`tel:${business.phone}`);
+              }
+            }}
+            className="flex-1 bg-green-500 text-white py-1.5 px-2 rounded-lg text-xs font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
+            disabled={!business.phone}
+          >
+            <Phone size={10} className="inline mr-1" />
+            Call
+          </button>
+          
+          {/* WhatsApp Button */}
+          {business.phone && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (business.phone) {
-                  window.open(`tel:${business.phone}`);
-                }
+                const formattedPhone = business.phone.replace(/[^\d]/g, '');
+                const message = encodeURIComponent(`Hello! I found your business ${business.name} on BizGallery and would like to know more.`);
+                window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank');
               }}
-              className="flex-1 bg-green-500 text-white py-1.5 px-2 rounded-lg text-xs font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
-              disabled={!business.phone}
+              className="flex-1 bg-green-600 text-white py-1.5 px-2 rounded-lg text-xs font-medium hover:bg-green-700 transition-colors"
             >
-              <Phone size={10} className="inline mr-1" />
-              Call
+              <MessageCircle size={10} className="inline mr-1" />
+              WhatsApp
             </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleSave(business.id);
-              }}
-              className={`p-1.5 rounded-lg transition-colors ${
-                savedItems.has(business.id)
-                  ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}
-            >
-              <Bookmark size={12} className={savedItems.has(business.id) ? 'fill-current' : ''} />
-            </button>
-          </div>
+          )}
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleSave(business.id);
+            }}
+            className={`p-1.5 rounded-lg transition-colors ${
+              savedItems.has(business.id)
+                ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+            }`}
+          >
+            <Bookmark size={12} className={savedItems.has(business.id) ? 'fill-current' : ''} />
+          </button>
+        </div>
         </div>
       </div>
     );
@@ -416,7 +433,7 @@ export default function ConnectedHomePage() {
 
         {/* Trending Businesses */}
         {trendingBusinesses.length > 0 && (
-          <div className="mb-6">
+          <div className="mb-6" data-trending="true">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <TrendingUp size={18} className="text-purple-600" />
@@ -471,7 +488,11 @@ export default function ConnectedHomePage() {
         <div className="container mx-auto px-4">
           <div className="flex justify-around py-2">
             <button
-              onClick={() => setActiveTab('home')}
+              onClick={() => {
+                setActiveTab('home');
+                // Scroll to top
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
                 activeTab === 'home'
                   ? 'text-violet-600 dark:text-violet-400'
@@ -482,7 +503,14 @@ export default function ConnectedHomePage() {
               <span className="text-xs">Home</span>
             </button>
             <button
-              onClick={() => setActiveTab('search')}
+              onClick={() => {
+                setActiveTab('search');
+                // Focus search input
+                const searchInput = document.querySelector('input[placeholder="Search businesses..."]') as HTMLInputElement;
+                if (searchInput) {
+                  searchInput.focus();
+                }
+              }}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
                 activeTab === 'search'
                   ? 'text-violet-600 dark:text-violet-400'
@@ -506,7 +534,11 @@ export default function ConnectedHomePage() {
               <span className="text-xs">Business</span>
             </button>
             <button
-              onClick={() => setActiveTab('map')}
+              onClick={() => {
+                setActiveTab('map');
+                // Navigate to map view
+                window.location.href = '/map';
+              }}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
                 activeTab === 'map'
                   ? 'text-violet-600 dark:text-violet-400'
@@ -517,7 +549,14 @@ export default function ConnectedHomePage() {
               <span className="text-xs">Map</span>
             </button>
             <button
-              onClick={() => setActiveTab('trending')}
+              onClick={() => {
+                setActiveTab('trending');
+                // Scroll to trending section
+                const trendingSection = document.querySelector('[data-trending="true"]');
+                if (trendingSection) {
+                  trendingSection.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
                 activeTab === 'trending'
                   ? 'text-violet-600 dark:text-violet-400'

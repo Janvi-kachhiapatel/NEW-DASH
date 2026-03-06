@@ -1,7 +1,11 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { Video } from 'lucide-react';
 import BusinessProfile from '@/components/business/BusinessProfile';
+import OffersDisplay from '@/components/offers/OffersDisplay';
+import ReelCreation from '@/components/reels/ReelCreation';
+import { dataStorage } from '@/lib/dataStorage';
 
 // Mock business data - in real app, this would come from API
 const mockBusinesses = [
@@ -232,31 +236,43 @@ export default function BusinessPage() {
   const slug = params.slug as string;
   const [business, setBusiness] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showReelCreation, setShowReelCreation] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
-    // Simulate API call to fetch business data
-    const fetchBusiness = async () => {
-      setLoading(true);
-      
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const foundBusiness = mockBusinesses.find(b => b.slug === slug);
+    fetchBusiness();
+  }, [slug]);
+
+  const fetchBusiness = async () => {
+    setLoading(true);
+    
+    try {
+      // Get business from persistent storage
+      const foundBusiness = dataStorage.getBusiness(slug);
       
       if (foundBusiness) {
         setBusiness(foundBusiness);
+        
+        // Check if current user is the owner (mock check)
+        const currentUser = localStorage.getItem('currentUser');
+        if (currentUser && foundBusiness.owner_id === currentUser) {
+          setIsOwner(true);
+        }
       } else {
-        // Business not found
         setBusiness(null);
       }
-      
+    } catch (error) {
+      console.error('Failed to fetch business:', error);
+    } finally {
       setLoading(false);
-    };
-
-    if (slug) {
-      fetchBusiness();
     }
-  }, [slug]);
+  };
+
+  const handleReelCreated = (reel: any) => {
+    console.log('Reel created:', reel);
+    // Refresh business data to show new reel
+    fetchBusiness();
+  };
 
   if (loading) {
     return (
@@ -291,5 +307,41 @@ export default function BusinessPage() {
     );
   }
 
-  return <BusinessProfile business={business} />;
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <BusinessProfile business={business} />
+      
+      {/* Offers Section */}
+      <div className="container mx-auto px-4 py-6">
+        <OffersDisplay 
+          businessId={business.id}
+          businessOwnerId={business.owner_id}
+          isOwner={isOwner}
+        />
+      </div>
+
+      {/* Reel Creation Button for Owners */}
+      {isOwner && (
+        <div className="container mx-auto px-4 py-6">
+          <button
+            onClick={() => setShowReelCreation(true)}
+            className="px-6 py-3 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors flex items-center gap-2"
+          >
+            <Video size={20} />
+            Create Reel
+          </button>
+        </div>
+      )}
+
+      {/* Reel Creation Modal */}
+      {showReelCreation && (
+        <ReelCreation
+          businessId={business.id}
+          businessName={business.name}
+          onReelCreated={handleReelCreated}
+          onClose={() => setShowReelCreation(false)}
+        />
+      )}
+    </div>
+  );
 }
