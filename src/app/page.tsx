@@ -3,6 +3,19 @@ import { useState, useEffect } from 'react';
 import { Search, Map, Home, TrendingUp, User, Plus, Filter, Star, Phone, MapPin, Heart, Bookmark, Calendar, BarChart3, MessageCircle } from 'lucide-react';
 import DirectBooking from '@/components/booking/DirectBooking';
 import PriceComparison from '@/components/comparison/PriceComparison';
+import AdvancedFilterPanel from '@/components/filters/AdvancedFilterPanel';
+import dynamic from 'next/dynamic';
+
+// Lazy load map component for better performance
+const BusinessMap = dynamic(() => import('@/components/maps/BusinessMap'), {
+  loading: () => (
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mx-auto mb-4"></div>
+      <p className="text-gray-600 dark:text-gray-400">Loading map...</p>
+    </div>
+  ),
+  ssr: false
+});
 
 interface Business {
   id: string;
@@ -63,10 +76,12 @@ const categories = [
 ];
 
 export default function ConnectedHomePage() {
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeView, setActiveView] = useState('feed');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [savedItems, setSavedItems] = useState(new Set());
+  const [savedItems, setSavedItems] = useState<Set<string>>(new Set());
+  const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [trendingBusinesses, setTrendingBusinesses] = useState<TrendingBusiness[]>([]);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
@@ -74,6 +89,61 @@ export default function ConnectedHomePage() {
   const [showComparison, setShowComparison] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [viralVideos, setViralVideos] = useState<any[]>([]);
+
+  // Add comparison view handler
+  const handleComparisonView = () => {
+    setActiveView('comparison');
+    setShowComparison(true);
+  };
+
+  // Add viral videos view handler
+  const handleViralVideosView = () => {
+    setActiveView('viral');
+    fetchViralVideos();
+  };
+
+  const fetchViralVideos = async () => {
+    try {
+      // Mock viral videos data
+      const mockVideos = [
+        {
+          id: '1',
+          title: 'Amazing Street Food in Ahmedabad',
+          thumbnail: '/api/placeholder/300/200',
+          views: '1.2M',
+          likes: '45K',
+          description: 'Must try street food places in the city',
+          category: 'Food',
+          duration: '2:45'
+        },
+        {
+          id: '2',
+          title: 'Best Shopping Deals This Week',
+          thumbnail: '/api/placeholder/300/200',
+          views: '890K',
+          likes: '32K',
+          description: 'Incredible shopping discounts you need to know',
+          category: 'Shopping',
+          duration: '3:12'
+        },
+        {
+          id: '3',
+          title: 'Top Rated Salons Near You',
+          thumbnail: '/api/placeholder/300/200',
+          views: '567K',
+          likes: '28K',
+          description: 'Most popular beauty salons in your area',
+          category: 'Beauty',
+          duration: '1:58'
+        }
+      ];
+      setViralVideos(mockVideos);
+    } catch (error) {
+      console.error('Failed to fetch viral videos:', error);
+    }
+  };
 
   useEffect(() => {
     fetchBusinesses();
@@ -106,8 +176,22 @@ export default function ConnectedHomePage() {
   };
 
   const fetchBusinesses = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
+      // Check if data is cached in localStorage
+      const cachedData = localStorage.getItem('businesses_cache');
+      const cacheTime = localStorage.getItem('businesses_cache_time');
+      const now = new Date().getTime();
+      
+      // Use cache if it's less than 5 minutes old
+      if (cachedData && cacheTime && (now - parseInt(cacheTime)) < 300000) {
+        const businesses = JSON.parse(cachedData);
+        setBusinesses(businesses);
+        setFilteredBusinesses(businesses);
+        setIsLoading(false);
+        return;
+      }
+      
       const params = new URLSearchParams();
       if (userLocation) {
         params.append('lat', userLocation.lat.toString());
@@ -116,12 +200,20 @@ export default function ConnectedHomePage() {
       
       const response = await fetch(`/api/businesses?${params.toString()}`);
       const result = await response.json();
-      
       if (result.success) {
         setBusinesses(result.data);
+        setFilteredBusinesses(result.data);
+      } else {
+        console.error('API Error:', result.error);
+        // Fallback to empty array
+        setBusinesses([]);
+        setFilteredBusinesses([]);
       }
     } catch (error) {
       console.error('Failed to fetch businesses:', error);
+      // Fallback to empty array
+      setBusinesses([]);
+      setFilteredBusinesses([]);
     } finally {
       setIsLoading(false);
     }
@@ -129,7 +221,6 @@ export default function ConnectedHomePage() {
 
   const fetchFilteredBusinesses = async () => {
     try {
-      setIsLoading(true);
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
       if (selectedCategory !== 'all') params.append('category', selectedCategory);
@@ -139,13 +230,24 @@ export default function ConnectedHomePage() {
       }
       
       const response = await fetch(`/api/businesses?${params.toString()}`);
-      const result = await response.json();
-      
-      if (result.success) {
-        setBusinesses(result.data);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      if (data.success) {
+        setBusinesses(data.data);
+        setFilteredBusinesses(data.data);
+      } else {
+        console.error('API Error:', data.error);
+        // Fallback to empty array
+        setBusinesses([]);
+        setFilteredBusinesses([]);
       }
     } catch (error) {
       console.error('Failed to fetch filtered businesses:', error);
+      // Fallback to empty array
+      setBusinesses([]);
+      setFilteredBusinesses([]);
     } finally {
       setIsLoading(false);
     }
@@ -154,13 +256,19 @@ export default function ConnectedHomePage() {
   const fetchTrendingBusinesses = async () => {
     try {
       const response = await fetch('/api/ai/trending');
-      const result = await response.json();
-      
-      if (result.success) {
-        setTrendingBusinesses(result.data.trending_businesses);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      if (data.success) {
+        setTrendingBusinesses(data.data.trending_businesses);
+      } else {
+        console.error('Trending API Error:', data.error);
+        setTrendingBusinesses([]);
       }
     } catch (error) {
       console.error('Failed to fetch trending businesses:', error);
+      setTrendingBusinesses([]);
     }
   };
 
@@ -171,6 +279,52 @@ export default function ConnectedHomePage() {
     } else {
       window.location.href = `/business/${business.slug}`;
     }
+  };
+
+  const handleFilterChange = (filters: any) => {
+    let filtered = [...businesses];
+    
+    // Apply category filter
+    if (filters.category !== 'all') {
+      filtered = filtered.filter(b => b.category === filters.category);
+    }
+    
+    // Apply rating filter
+    if (filters.rating > 0) {
+      filtered = filtered.filter(b => b.rating >= filters.rating);
+    }
+    
+    // Apply price range filter
+    if (filters.priceRange !== 'all') {
+      filtered = filtered.filter(b => b.price_range === filters.priceRange);
+    }
+    
+    // Apply verified filter
+    if (filters.verified) {
+      filtered = filtered.filter(b => b.is_verified);
+    }
+    
+    // Apply offers filter
+    if (filters.offers) {
+      filtered = filtered.filter(b => b.offers && b.offers.length > 0);
+    }
+    
+    // Apply open now filter
+    if (filters.openNow) {
+      const now = new Date();
+      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const currentDay = days[now.getDay()];
+      const currentTime = now.getHours() + ':' + now.getMinutes().toString().padStart(2, '0');
+      
+      filtered = filtered.filter(b => {
+        if ('operating_hours' in b && b.operating_hours && b.operating_hours[currentDay]) {
+          return b.operating_hours[currentDay].is_open;
+        }
+        return true;
+      });
+    }
+    
+    setFilteredBusinesses(filtered);
   };
 
   const toggleSave = (businessId: string) => {
@@ -188,6 +342,7 @@ export default function ConnectedHomePage() {
   const BusinessGridCard = ({ business, showTrending = false }: { business: Business | TrendingBusiness; showTrending?: boolean }) => {
     const isTrending = 'trending_score' in business;
     const trendingBusiness = business as TrendingBusiness;
+    const hasBookableServices = 'services' in business && business.services?.some((s: any) => s.is_bookable);
 
     return (
       <div 
@@ -196,100 +351,122 @@ export default function ConnectedHomePage() {
       >
         {/* Trending Badge */}
         {isTrending && (
-          <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-            <TrendingUp size={10} />
-            Trending
+          <div className="absolute top-2 right-2 z-10">
+            <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+              <TrendingUp size={12} />
+              Trending
+            </div>
           </div>
         )}
 
-        {/* Header Image */}
-        <div className="h-24 bg-gradient-to-br from-violet-500 to-indigo-600 relative">
-          {business.is_featured && (
-            <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
-              ⭐ Featured
+        {/* Verified Badge */}
+        {business.is_verified && (
+          <div className="absolute top-2 left-2 z-10">
+            <div className="bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+              <CheckCircle size={12} />
+              Verified
             </div>
-          )}
-          {business.is_verified && (
-            <div className="absolute bottom-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-              ✓ Verified
+          </div>
+        )}
+
+        {/* Image */}
+        <div className="h-32 bg-gradient-to-br from-violet-100 to-pink-100 dark:from-violet-900/20 dark:to-pink-900/20 relative">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-12 h-12 bg-violet-600 rounded-full flex items-center justify-center">
+              <span className="text-white font-bold text-lg">
+                {business.name.charAt(0).toUpperCase()}
+              </span>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Content */}
         <div className="p-3">
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-1 line-clamp-1">
-                {business.name}
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                {business.category}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-500 line-clamp-1">
-                {business.description}
-              </p>
-            </div>
+          <div className="mb-2">
+            <h3 className="font-semibold text-gray-900 dark:text-white text-sm line-clamp-1">
+              {business.name}
+            </h3>
+            <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1">
+              {business.category}
+            </p>
           </div>
 
-          {/* Rating and Price */}
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1">
-              <Star size={12} className="text-yellow-500 fill-yellow-500" />
-              <span className="text-xs font-medium">{business.rating}</span>
-              <span className="text-xs text-gray-500">({business.review_count})</span>
-            </div>
-            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              {business.price_range}
-            </span>
+          {/* Rating */}
+          <div className="flex items-center gap-1 mb-2">
+            <Star size={12} className="text-yellow-500 fill-yellow-500" />
+            <span className="text-sm font-medium">{business.rating}</span>
+            <span className="text-xs text-gray-500">({business.review_count})</span>
           </div>
 
-          {/* Distance and Location */}
+          {/* Price Range */}
+          <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+            {business.price_range}
+          </div>
+
+          {/* Location */}
           {business.distance && (
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1 text-xs text-gray-500">
-                <MapPin size={10} />
-                <span>{business.distance.toFixed(1)} km</span>
-              </div>
-            </div>
-          )}
-
-          {/* Trending Score */}
-          {isTrending && (
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-gray-600 dark:text-gray-400">Trending:</span>
-                <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
-                  {trendingBusiness.trending_score}%
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Offer Badge */}
-          {business.offers && business.offers.length > 0 && (
-            <div className="mb-2">
-              <span className="inline-block bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs px-2 py-1 rounded">
-                🔥 {business.offers[0].discount_percent}% OFF
-              </span>
+            <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 mb-2">
+              <MapPin size={10} />
+              {business.distance.toFixed(1)} km
             </div>
           )}
 
           {/* Action Buttons */}
-        <div className="flex gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (business.phone) {
-                window.open(`tel:${business.phone}`);
-              }
-            }}
-            className="flex-1 bg-green-500 text-white py-1.5 px-2 rounded-lg text-xs font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
-            disabled={!business.phone}
-          >
-            <Phone size={10} className="inline mr-1" />
-            Call
-          </button>
+          <div className="flex gap-1 mt-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleSave(business.id);
+              }}
+              className={`flex-1 px-2 py-1 rounded text-xs transition-colors ${
+                savedItems.has(business.id)
+                  ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+              }`}
+            >
+              <Heart size={12} className={savedItems.has(business.id) ? 'fill-current' : ''} />
+            </button>
+            
+            {hasBookableServices && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedBusiness(business);
+                  setShowBooking(true);
+                }}
+                className="flex-1 px-2 py-1 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded text-xs hover:bg-violet-200 dark:hover:bg-violet-900/50 transition-colors"
+              >
+                Book
+              </button>
+            )}
+            
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                window.location.href = `/business/${business.slug}`;
+              }}
+              className="flex-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              View
+            </button>
+          </div>
+
+          {/* Offers Section */}
+          {business.offers && business.offers.length > 0 && (
+            <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-red-600 dark:text-red-400">🔥</span>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-red-800 dark:text-red-200">
+                    {business.offers[0].title}
+                  </p>
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    {business.offers[0].discount_percent}% OFF
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* WhatsApp Button */}
           {business.phone && (
@@ -300,31 +477,26 @@ export default function ConnectedHomePage() {
                 const message = encodeURIComponent(`Hello! I found your business ${business.name} on BizGallery and would like to know more.`);
                 window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank');
               }}
-              className="flex-1 bg-green-600 text-white py-1.5 px-2 rounded-lg text-xs font-medium hover:bg-green-700 transition-colors"
+              className="flex-1 bg-green-500 text-white py-1.5 px-2 rounded-lg text-xs font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
+              disabled={!business.phone}
             >
               <MessageCircle size={10} className="inline mr-1" />
               WhatsApp
             </button>
           )}
-          
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleSave(business.id);
-            }}
-            className={`p-1.5 rounded-lg transition-colors ${
-              savedItems.has(business.id)
-                ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-            }`}
-          >
-            <Bookmark size={12} className={savedItems.has(business.id) ? 'fill-current' : ''} />
-          </button>
-        </div>
         </div>
       </div>
     );
   };
+
+  // Add missing CheckCircle import
+  const CheckCircle = ({ size, className }: any) => (
+    <div className={className} style={{ width: size, height: size }}>
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+      </svg>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -363,11 +535,15 @@ export default function ConnectedHomePage() {
               >
                 <BarChart3 size={18} className="text-gray-600 dark:text-gray-400" />
               </button>
-              <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="Advanced Filters"
+              >
                 <Filter size={18} className="text-gray-600 dark:text-gray-400" />
               </button>
               <button 
-                onClick={() => window.location.href = '/dashboard/business-owner'}
+                onClick={() => window.location.href = '/dashboard'}
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <User size={18} className="text-gray-600 dark:text-gray-400" />
@@ -409,27 +585,101 @@ export default function ConnectedHomePage() {
         </div>
       </div>
 
+      {/* Advanced Filter Panel */}
+      <div className="container mx-auto px-4 py-4">
+        <AdvancedFilterPanel 
+          onFilterChange={handleFilterChange}
+          businesses={businesses}
+        />
+      </div>
+
       {/* Main Content */}
       <div className="container mx-auto px-4 py-4">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-4 gap-3 mb-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-violet-600 dark:text-violet-400">10K+</div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">Businesses</div>
+        {/* Comparison View */}
+        {activeView === 'comparison' && (
+          <div className="mb-8">
+            <PriceComparison 
+              businesses={businesses}
+              onClose={() => {
+                setActiveView('feed');
+                setShowComparison(false);
+              }}
+            />
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-green-600 dark:text-green-400">50K+</div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">Users</div>
+        )}
+
+        {/* Viral Videos View */}
+        {activeView === 'viral' && (
+          <div className="mb-8">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <span className="text-2xl">📹</span>
+                    Viral Videos
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Trending business videos in your area
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {viralVideos.map((video) => (
+                  <div key={video.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
+                    <div className="relative">
+                      <img 
+                        src={video.thumbnail} 
+                        alt={video.title}
+                        className="w-full h-40 object-cover"
+                      />
+                      <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                        {video.duration}
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-3">
+                        <h3 className="text-white font-semibold text-sm line-clamp-2">
+                          {video.title}
+                        </h3>
+                        <div className="flex items-center gap-4 mt-1">
+                          <span className="text-white text-xs">👁 {video.views}</span>
+                          <span className="text-white text-xs">❤️ {video.likes}</span>
+                          <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                            {video.category}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-blue-600 dark:text-blue-400">4.8</div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">Rating</div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-orange-600 dark:text-orange-400">24/7</div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">Support</div>
-          </div>
-        </div>
+        )}
+
+        {/* Feed View */}
+        {activeView !== 'comparison' && (
+          <>
+            {/* Quick Stats */}
+            <div className="grid grid-cols-4 gap-3 mb-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-violet-600 dark:text-violet-400">10K+</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">Businesses</div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-green-600 dark:text-green-400">50K+</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">Users</div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-blue-600 dark:text-blue-400">4.8</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">Rating</div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-orange-600 dark:text-orange-400">24/7</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">Support</div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Trending Businesses */}
         {trendingBusinesses.length > 0 && (
@@ -458,7 +708,7 @@ export default function ConnectedHomePage() {
               {selectedCategory === 'all' ? 'All Businesses' : `${selectedCategory} Businesses`}
             </h2>
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              {businesses.length} results
+              {filteredBusinesses.length} results
             </div>
           </div>
           
@@ -475,7 +725,7 @@ export default function ConnectedHomePage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {businesses.map((business) => (
+              {filteredBusinesses.map((business) => (
                 <BusinessGridCard key={business.id} business={business} />
               ))}
             </div>
@@ -489,12 +739,12 @@ export default function ConnectedHomePage() {
           <div className="flex justify-around py-2">
             <button
               onClick={() => {
-                setActiveTab('home');
+                setActiveView('home');
                 // Scroll to top
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                activeTab === 'home'
+                activeView === 'home'
                   ? 'text-violet-600 dark:text-violet-400'
                   : 'text-gray-600 dark:text-gray-400'
               }`}
@@ -504,7 +754,7 @@ export default function ConnectedHomePage() {
             </button>
             <button
               onClick={() => {
-                setActiveTab('search');
+                setActiveView('search');
                 // Focus search input
                 const searchInput = document.querySelector('input[placeholder="Search businesses..."]') as HTMLInputElement;
                 if (searchInput) {
@@ -512,7 +762,7 @@ export default function ConnectedHomePage() {
                 }
               }}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                activeTab === 'search'
+                activeView === 'search'
                   ? 'text-violet-600 dark:text-violet-400'
                   : 'text-gray-600 dark:text-gray-400'
               }`}
@@ -521,9 +771,31 @@ export default function ConnectedHomePage() {
               <span className="text-xs">Search</span>
             </button>
             <button
-              onClick={() => window.location.href = '/dashboard/business-owner'}
+              onClick={handleComparisonView}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                activeTab === 'add'
+                activeView === 'comparison'
+                  ? 'text-violet-600 dark:text-violet-400'
+                  : 'text-gray-600 dark:text-gray-400'
+              }`}
+            >
+              <BarChart3 size={20} />
+              <span className="text-xs">Compare</span>
+            </button>
+            <button
+              onClick={handleViralVideosView}
+              className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+                activeView === 'viral'
+                  ? 'text-violet-600 dark:text-violet-400'
+                  : 'text-gray-600 dark:text-gray-400'
+              }`}
+            >
+              <span className="text-lg">📹</span>
+              <span className="text-xs">Videos</span>
+            </button>
+            <button
+              onClick={() => window.location.href = '/dashboard'}
+              className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+                activeView === 'add'
                   ? 'text-violet-600 dark:text-violet-400'
                   : 'text-gray-600 dark:text-gray-400'
               }`}
@@ -535,12 +807,12 @@ export default function ConnectedHomePage() {
             </button>
             <button
               onClick={() => {
-                setActiveTab('map');
+                setActiveView('map');
                 // Navigate to map view
                 window.location.href = '/map';
               }}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                activeTab === 'map'
+                activeView === 'map'
                   ? 'text-violet-600 dark:text-violet-400'
                   : 'text-gray-600 dark:text-gray-400'
               }`}
@@ -550,7 +822,7 @@ export default function ConnectedHomePage() {
             </button>
             <button
               onClick={() => {
-                setActiveTab('trending');
+                setActiveView('trending');
                 // Scroll to trending section
                 const trendingSection = document.querySelector('[data-trending="true"]');
                 if (trendingSection) {
@@ -558,7 +830,7 @@ export default function ConnectedHomePage() {
                 }
               }}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                activeTab === 'trending'
+                activeView === 'trending'
                   ? 'text-violet-600 dark:text-violet-400'
                   : 'text-gray-600 dark:text-gray-400'
               }`}

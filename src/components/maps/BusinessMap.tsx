@@ -56,6 +56,9 @@ export default function BusinessMap({
   const [map, setMap] = useState<any>(null);
   const [markers, setMarkers] = useState<any[]>([]);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
+  const [showLocationInput, setShowLocationInput] = useState(false);
+  const [customLocation, setCustomLocation] = useState({ lat: '', lng: '' });
+  const [isAddingLocation, setIsAddingLocation] = useState(false);
   const [filters, setFilters] = useState({
     category: 'All',
     rating: 0,
@@ -91,8 +94,13 @@ export default function BusinessMap({
 
     const initializeMap = async () => {
       try {
-        // Dynamic import for Leaflet
-        const L = await import('leaflet');
+        setIsLoading(true);
+        
+        // Dynamic import for Leaflet with timeout
+        const L = await Promise.race([
+          import('leaflet'),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Map loading timeout')), 5000))
+        ]) as any;
         
         // Fix Leaflet default markers
         delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -105,6 +113,7 @@ export default function BusinessMap({
         // Check if container is already initialized
         if (mapInstanceRef.current) {
           console.log('Map already initialized, skipping...');
+          setIsLoading(false);
           return;
         }
 
@@ -115,18 +124,27 @@ export default function BusinessMap({
             ? [businesses[0].location_lat, businesses[0].location_lng]
             : [20.5937, 78.9629]; // Default to India center
 
-        const leafletMap = L.map(mapRef.current).setView(center, 13);
+        const leafletMap = L.map(mapRef.current, {
+          center,
+          zoom: 13,
+          zoomControl: true,
+          attributionControl: false
+        });
 
-        // Add tile layer
+        // Add tile layer with caching
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap contributors',
-          maxZoom: 19
+          maxZoom: 19,
+          className: 'map-tiles'
         }).addTo(leafletMap);
+
+        // Add attribution separately
+        leafletMap.attributionControl.setPrefix('<a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a>');
 
         // Add user location marker
         if (userLocation) {
           const userIcon = L.divIcon({
-            html: `<div class="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg"></div>`,
+            html: `<div class="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg animate-pulse"></div>`,
             className: 'user-location-marker',
             iconSize: [16, 16],
             iconAnchor: [8, 8]
@@ -144,9 +162,23 @@ export default function BusinessMap({
         setIsMapInitialized(true);
         setIsLoading(false);
 
+        console.log('Map initialized successfully');
+
       } catch (error) {
         console.error('Failed to initialize map:', error);
         setIsLoading(false);
+        // Show error message to user
+        if (mapRef.current) {
+          mapRef.current.innerHTML = `
+            <div class="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-800">
+              <div class="text-center p-4">
+                <div class="text-red-500 mb-2">⚠️</div>
+                <p class="text-gray-600 dark:text-gray-400">Unable to load map</p>
+                <button onclick="window.location.reload()" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded">Retry</button>
+              </div>
+            </div>
+          `;
+        }
       }
     };
 
@@ -160,7 +192,7 @@ export default function BusinessMap({
         setIsMapInitialized(false);
       }
     };
-  }, []); // Empty dependency array to run only once
+  }, [userLocation, businesses.length]); // Reduced dependencies for better performance
 
   // Helper to filter businesses based on current filters & search
   const getFilteredBusinesses = () => {
@@ -354,6 +386,76 @@ export default function BusinessMap({
     }
   }, [map, userLocation, userMarker]);
 
+  const handleAddCustomLocation = () => {
+    const lat = parseFloat(customLocation.lat);
+    const lng = parseFloat(customLocation.lng);
+    
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      alert('Please enter valid latitude (-90 to 90) and longitude (-180 to 180)');
+      return;
+    }
+
+    setIsAddingLocation(true);
+    
+    // Add marker for custom location
+    const L = require('leaflet');
+    const customIcon = L.divIcon({
+      html: `<div class="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+               <span class="text-white text-xs font-bold">📍</span>
+             </div>`,
+      className: 'custom-location-marker',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+
+    const marker = L.marker([lat, lng], { icon: customIcon })
+      .addTo(map)
+      .bindPopup(`Custom Location: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+
+    setMarkers(prev => [...prev, marker]);
+    map.setView([lat, lng], 15);
+    
+    // Reset form
+    setCustomLocation({ lat: '', lng: '' });
+    setShowLocationInput(false);
+    setIsAddingLocation(false);
+  };
+
+  const handleMapClick = (e: any) => {
+    if (!map || !isAddingLocation) return;
+    
+    const { lat, lng } = e.latlng;
+    
+    // Add marker at clicked location
+    const L = require('leaflet');
+    const clickIcon = L.divIcon({
+      html: `<div class="w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+               <span class="text-white text-xs font-bold">✓</span>
+             </div>`,
+      className: 'click-location-marker',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+
+    const marker = L.marker([lat, lng], { icon: clickIcon })
+      .addTo(map)
+      .bindPopup(`Selected Location: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+
+    setMarkers(prev => [...prev, marker]);
+    setCustomLocation({ lat: lat.toFixed(4), lng: lng.toFixed(4) });
+    setIsAddingLocation(false);
+  };
+
+  // Add map click handler when in adding location mode
+  useEffect(() => {
+    if (map && isAddingLocation) {
+      map.on('click', handleMapClick);
+      return () => {
+        map.off('click', handleMapClick);
+      };
+    }
+  }, [map, isAddingLocation]);
+
   const handleFilterChange = (key: string, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -408,6 +510,17 @@ export default function BusinessMap({
               />
             </div>
             <button
+              onClick={() => setShowLocationInput(!showLocationInput)}
+              className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                showLocationInput || isAddingLocation
+                  ? 'bg-red-600 text-white' 
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              <MapPin size={20} />
+              {isAddingLocation ? 'Click on Map' : 'Add Location'}
+            </button>
+            <button
               onClick={() => setShowFilters(!showFilters)}
               className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
                 Object.values(filters).some(v => v !== 0 && v !== 'All' && v !== false) 
@@ -429,6 +542,78 @@ export default function BusinessMap({
               <Target size={20} />
             </button>
           </div>
+
+          {/* Location Input Panel */}
+          {showLocationInput && (
+            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                Add Custom Location
+              </h4>
+              <div className="flex gap-2 mb-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Latitude
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="e.g., 23.0225"
+                    value={customLocation.lat}
+                    onChange={(e) => setCustomLocation(prev => ({ ...prev, lat: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-600 dark:text-white"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Longitude
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="e.g., 72.5714"
+                    value={customLocation.lng}
+                    onChange={(e) => setCustomLocation(prev => ({ ...prev, lng: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-600 dark:text-white"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAddCustomLocation}
+                  disabled={!customLocation.lat || !customLocation.lng}
+                  className="flex-1 bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add Location
+                </button>
+                <button
+                  onClick={() => {
+                    setIsAddingLocation(true);
+                    setShowLocationInput(false);
+                  }}
+                  className="flex-1 bg-green-600 text-white py-2 px-3 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                >
+                  Click on Map
+                </button>
+                <button
+                  onClick={() => {
+                    setShowLocationInput(false);
+                    setIsAddingLocation(false);
+                    setCustomLocation({ lat: '', lng: '' });
+                  }}
+                  className="px-3 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+              {isAddingLocation && (
+                <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                  <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                    Click anywhere on the map to add a location marker
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Filter Panel */}
           {showFilters && (

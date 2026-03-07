@@ -5,6 +5,9 @@ import { Video } from 'lucide-react';
 import BusinessProfile from '@/components/business/BusinessProfile';
 import OffersDisplay from '@/components/offers/OffersDisplay';
 import ReelCreation from '@/components/reels/ReelCreation';
+import ReviewWithImages from '@/components/reviews/ReviewWithImages';
+import ShopVerification from '@/components/verification/ShopVerification';
+import NotificationSystem from '@/components/notifications/NotificationSystem';
 import { dataStorage } from '@/lib/dataStorage';
 
 // Mock business data - in real app, this would come from API
@@ -238,6 +241,7 @@ export default function BusinessPage() {
   const [loading, setLoading] = useState(true);
   const [showReelCreation, setShowReelCreation] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+  const [reviews, setReviews] = useState<any[]>([]);
 
   useEffect(() => {
     fetchBusiness();
@@ -253,6 +257,10 @@ export default function BusinessPage() {
       if (foundBusiness) {
         setBusiness(foundBusiness);
         
+        // Get reviews for this business
+        const businessReviews = dataStorage.getReviewsForBusiness(foundBusiness.id);
+        setReviews(businessReviews);
+        
         // Check if current user is the owner (mock check)
         const currentUser = localStorage.getItem('currentUser');
         if (currentUser && foundBusiness.owner_id === currentUser) {
@@ -265,6 +273,16 @@ export default function BusinessPage() {
       console.error('Failed to fetch business:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReviewSubmitted = (review: any) => {
+    // Add review to storage
+    dataStorage.addReview(review);
+    // Refresh reviews
+    if (business) {
+      const updatedReviews = dataStorage.getReviewsForBusiness(business.id);
+      setReviews(updatedReviews);
     }
   };
 
@@ -311,6 +329,16 @@ export default function BusinessPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <BusinessProfile business={business} />
       
+      {/* Reviews with Images */}
+      <div className="container mx-auto px-4 py-6">
+        <ReviewWithImages 
+          businessId={business.id}
+          businessName={business.name}
+          onReviewSubmitted={handleReviewSubmitted}
+          existingReviews={reviews}
+        />
+      </div>
+      
       {/* Offers Section */}
       <div className="container mx-auto px-4 py-6">
         <OffersDisplay 
@@ -319,6 +347,21 @@ export default function BusinessPage() {
           isOwner={isOwner}
         />
       </div>
+
+      {/* Shop Verification for Owners */}
+      {isOwner && (
+        <div className="container mx-auto px-4 py-6">
+          <ShopVerification
+            businessId={business.id}
+            businessName={business.name}
+            onVerificationComplete={(status) => {
+              console.log('Verification completed:', status);
+              // Refresh business data
+              fetchBusiness();
+            }}
+          />
+        </div>
+      )}
 
       {/* Reel Creation Button for Owners */}
       {isOwner && (

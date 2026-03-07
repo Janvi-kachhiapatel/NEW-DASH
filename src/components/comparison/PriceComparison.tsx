@@ -3,8 +3,10 @@ import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Star, MapPin, Phone, ExternalLink, Filter, ChevronDown } from 'lucide-react';
 
 interface PriceComparisonProps {
-  category: string;
+  businesses?: any[];
+  category?: string;
   service?: string;
+  onClose?: () => void;
 }
 
 interface BusinessComparison {
@@ -29,7 +31,8 @@ interface MarketInsights {
 export default function PriceComparison({ category, service }: PriceComparisonProps) {
   const [comparisons, setComparisons] = useState<BusinessComparison[]>([]);
   const [marketInsights, setMarketInsights] = useState<MarketInsights | null>(null);
-  const [sortBy, setSortBy] = useState<'price' | 'rating' | 'value'>('value');
+  const [sortBy, setSortBy] = useState<'price' | 'rating' | 'value' | 'distance' | 'name' | 'popularity'>('value');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -55,16 +58,32 @@ export default function PriceComparison({ category, service }: PriceComparisonPr
 
   const sortComparisons = (data: BusinessComparison[]) => {
     const sorted = [...data];
+    let result = [...sorted];
+    
     switch (sortBy) {
       case 'price':
-        return sorted.sort((a, b) => a.price - b.price);
+        result = sorted.sort((a, b) => sortOrder === 'asc' ? a.price - b.price : b.price - a.price);
+        break;
       case 'rating':
-        return sorted.sort((a, b) => b.rating - a.rating);
+        result = sorted.sort((a, b) => sortOrder === 'asc' ? a.rating - b.rating : b.rating - a.rating);
+        break;
       case 'value':
-        return sorted.sort((a, b) => b.value_score - a.value_score);
+        result = sorted.sort((a, b) => sortOrder === 'asc' ? a.value_score - b.value_score : b.value_score - a.value_score);
+        break;
+      case 'distance':
+        result = sorted.sort((a, b) => sortOrder === 'asc' ? a.distance - b.distance : b.distance - a.distance);
+        break;
+      case 'name':
+        result = sorted.sort((a, b) => sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
+        break;
+      case 'popularity':
+        result = sorted.sort((a, b) => sortOrder === 'asc' ? a.rating - b.rating : b.rating - a.rating);
+        break;
       default:
-        return sorted;
+        result = sorted;
     }
+    
+    return result;
   };
 
   const getPriceTrend = (price: number, average: number) => {
@@ -113,12 +132,22 @@ export default function PriceComparison({ category, service }: PriceComparisonPr
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white"
+            className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white mr-2"
           >
             <option value="value">Best Value</option>
             <option value="price">Lowest Price</option>
             <option value="rating">Highest Rating</option>
+            <option value="distance">Nearest</option>
+            <option value="name">Name (A-Z)</option>
+            <option value="popularity">Most Popular</option>
           </select>
+          <button
+            onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+            className="flex items-center gap-1 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600"
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+            {sortOrder === 'desc' ? 'Desc' : 'Asc'}
+          </button>
         </div>
       </div>
 
