@@ -112,6 +112,34 @@ class DataStorage {
     this.initializeDatabase();
   }
 
+  private saveToLocalStorage(collection: string, data: any[]) {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      console.warn('localStorage is not available, skipping save operation');
+      return;
+    }
+    
+    try {
+      localStorage.setItem(collection, JSON.stringify(data));
+    } catch (error) {
+      console.error(`Failed to save ${collection} to localStorage:`, error);
+    }
+  }
+
+  private getFromLocalStorage(collection: string): any[] {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      console.warn('localStorage is not available, returning empty array');
+      return [];
+    }
+    
+    try {
+      const data = localStorage.getItem(collection);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error(`Failed to load ${collection} from localStorage:`, error);
+      return [];
+    }
+  }
+
   static getInstance(): DataStorage {
     if (!DataStorage.instance) {
       DataStorage.instance = new DataStorage();
@@ -121,6 +149,11 @@ class DataStorage {
 
   private initializeDatabase() {
     if (this.initialized) return;
+    
+    if (typeof window === 'undefined' || !window.localStorage) {
+      console.warn('localStorage is not available, skipping database initialization');
+      return;
+    }
     
     // Initialize all collections if they don't exist
     const collections = ['businesses', 'bookings', 'reviews', 'users', 'reels'];
@@ -307,7 +340,7 @@ class DataStorage {
       } as Business;
 
       businesses.push(newBusiness);
-      localStorage.setItem('businesses', JSON.stringify(businesses));
+      this.saveToLocalStorage('businesses', businesses);
       
       console.log('Business added successfully:', newBusiness.id);
       return newBusiness;
@@ -332,7 +365,7 @@ class DataStorage {
         updated_at: new Date().toISOString()
       };
 
-      localStorage.setItem('businesses', JSON.stringify(businesses));
+      this.saveToLocalStorage('businesses', businesses);
       
       console.log('Business updated successfully:', id);
       return businesses[index];
@@ -351,7 +384,7 @@ class DataStorage {
         throw new Error('Business not found');
       }
 
-      localStorage.setItem('businesses', JSON.stringify(filteredBusinesses));
+      this.saveToLocalStorage('businesses', filteredBusinesses);
       
       console.log('Business deleted successfully:', id);
       return true;
@@ -364,8 +397,7 @@ class DataStorage {
   // Bookings CRUD
   getBookings(): Booking[] {
     try {
-      const data = localStorage.getItem('bookings');
-      return data ? JSON.parse(data) : [];
+      return this.getFromLocalStorage('bookings');
     } catch (error) {
       console.error('Failed to get bookings:', error);
       return [];
@@ -384,7 +416,7 @@ class DataStorage {
       } as Booking;
 
       bookings.push(newBooking);
-      localStorage.setItem('bookings', JSON.stringify(bookings));
+      this.saveToLocalStorage('bookings', bookings);
       
       console.log('Booking added successfully:', newBooking.id);
       return newBooking;
@@ -413,8 +445,7 @@ class DataStorage {
   // Reviews CRUD
   getReviews(): Review[] {
     try {
-      const data = localStorage.getItem('reviews');
-      return data ? JSON.parse(data) : [];
+      return this.getFromLocalStorage('reviews');
     } catch (error) {
       console.error('Failed to get reviews:', error);
       return [];
@@ -443,7 +474,7 @@ class DataStorage {
       } as Review;
 
       reviews.push(newReview);
-      localStorage.setItem('reviews', JSON.stringify(reviews));
+      this.saveToLocalStorage('reviews', reviews);
 
       // Update business rating
       this.updateBusinessRating(reviewData.business_id!);
@@ -468,7 +499,7 @@ class DataStorage {
         businesses[businessIndex].review_count = reviews.length;
         businesses[businessIndex].updated_at = new Date().toISOString();
         
-        localStorage.setItem('businesses', JSON.stringify(businesses));
+        this.saveToLocalStorage('businesses', businesses);
       }
     } catch (error) {
       console.error('Failed to update business rating:', error);
@@ -478,8 +509,7 @@ class DataStorage {
   // Users CRUD
   getUsers(): User[] {
     try {
-      const data = localStorage.getItem('users');
-      return data ? JSON.parse(data) : [];
+      return this.getFromLocalStorage('users');
     } catch (error) {
       console.error('Failed to get users:', error);
       return [];
@@ -497,7 +527,7 @@ class DataStorage {
       } as User;
 
       users.push(newUser);
-      localStorage.setItem('users', JSON.stringify(users));
+      this.saveToLocalStorage('users', users);
       
       console.log('User added successfully:', newUser.id);
       return newUser;
@@ -507,11 +537,9 @@ class DataStorage {
     }
   }
 
-  // Reels CRUD
   getReels(): Reel[] {
     try {
-      const data = localStorage.getItem('reels');
-      return data ? JSON.parse(data) : [];
+      return this.getFromLocalStorage('reels');
     } catch (error) {
       console.error('Failed to get reels:', error);
       return [];
@@ -532,7 +560,7 @@ class DataStorage {
       } as Reel;
 
       reels.push(newReel);
-      localStorage.setItem('reels', JSON.stringify(reels));
+      this.saveToLocalStorage('reels', reels);
       
       console.log('Reel added successfully:', newReel.id);
       return newReel;

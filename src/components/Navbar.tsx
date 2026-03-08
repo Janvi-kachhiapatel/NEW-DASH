@@ -1,35 +1,27 @@
 "use client";
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, ShoppingCart, LogOut, LayoutDashboard, ArrowLeft } from 'lucide-react';
+import { Moon, Sun, ShoppingCart, ArrowLeft, User, LogOut } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 
 export default function Navbar() {
-  const [user, setUser] = useState(null);
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const { user, signOut, isAuthenticated } = useAuth();
 
   useEffect(() => setMounted(true), []);
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    getUser();
-  }, []);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.href = '/';
-  };
-
   const toggleTheme = () => {
     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+  };
+
+  const handleSignOut = () => {
+    signOut();
+    router.push('/');
   };
 
   return (
@@ -76,31 +68,51 @@ export default function Navbar() {
               </button>
             )}
 
-            {/* Auth Buttons */}
-            {user ? (
-              <>
-                <Link href="/dashboard" className="flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:text-violet-600 font-medium transition-all duration-300 hover:scale-105 px-3 py-2 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20">
-                  <LayoutDashboard size={18} /> 
-                  <span className="hidden sm:inline">Dashboard</span>
-                </Link>
+            {/* Authentication Buttons */}
+            {isAuthenticated && user ? (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-600 dark:text-gray-300 hidden sm:block">
+                  Hi, {user.name}
+                </span>
+                {user.role === 'business_owner' && (
+                  <Link 
+                    href="/owner" 
+                    className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg shadow-violet-500/30 transition-all duration-300 transform hover:-translate-y-0.5 hover:scale-105 flex items-center gap-2"
+                  >
+                    <ShoppingCart size={16} />
+                    Dashboard
+                  </Link>
+                )}
                 <button 
-                  onClick={handleLogout} 
-                  className="flex items-center gap-2 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium transition-all duration-300 hover:scale-105 px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+                  onClick={handleSignOut}
+                  className="p-2 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-300 group shadow-md border border-red-200 dark:border-red-700"
+                  aria-label="Sign out"
                 >
-                  <LogOut size={18} /> 
-                  <span className="hidden sm:inline">Logout</span>
+                  <LogOut size={20} className="text-red-600 dark:text-red-400" />
                 </button>
-              </>
+              </div>
             ) : (
-              <>
-                <Link href="/login" className="text-gray-700 dark:text-gray-300 font-medium hover:text-violet-600 transition-all duration-300 hidden sm:block hover:scale-105 px-3 py-2 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20">
-                  Login
+              <div className="flex items-center gap-3">
+                <Link 
+                  href="/login" 
+                  className="text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 font-medium text-sm px-4 py-2 rounded-lg border border-violet-200 dark:border-violet-700 hover:bg-violet-50 dark:hover:bg-violet-900/30 transition-all duration-300"
+                >
+                  Sign In
                 </Link>
-                <Link href="/signup" className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white px-6 py-2 rounded-xl font-bold text-sm shadow-lg shadow-violet-500/30 transition-all duration-300 transform hover:-translate-y-0.5 hover:scale-105 flex items-center gap-2">
+                <Link 
+                  href="/signup" 
+                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg shadow-violet-500/30 transition-all duration-300 transform hover:-translate-y-0.5 hover:scale-105"
+                >
+                  Sign Up
+                </Link>
+                <Link 
+                  href="/owner" 
+                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white px-6 py-2 rounded-xl font-bold text-sm shadow-lg shadow-violet-500/30 transition-all duration-300 transform hover:-translate-y-0.5 hover:scale-105 flex items-center gap-2"
+                >
                   <ShoppingCart size={16} />
-                  Start Selling
+                  For Business Owners
                 </Link>
-              </>
+              </div>
             )}
           </div>
         </div>

@@ -133,10 +133,13 @@ export default function BusinessVerification({ onVerificationComplete, businessD
 
       // Mock verification success
       setVerificationStatus('verified');
-      verificationData.status = 'verified';
-      verificationData.verified_at = new Date().toISOString();
+      const finalVerificationData = {
+        ...verificationData,
+        status: 'verified' as const,
+        verified_at: new Date().toISOString()
+      };
 
-      onVerificationComplete(verificationData);
+      onVerificationComplete(finalVerificationData);
       
     } catch (error) {
       console.error('Verification failed:', error);

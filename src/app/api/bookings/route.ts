@@ -42,9 +42,8 @@ export async function POST(request: NextRequest) {
       customer_phone,
       booking_date,
       booking_time,
-      guests: guests || 2,
-      special_requests: special_requests || '',
-      status: 'confirmed'
+      status: 'confirmed',
+      notes: special_requests || ''
     });
 
     // Send confirmation email (mock)

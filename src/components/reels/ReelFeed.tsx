@@ -69,7 +69,7 @@ export default function ReelFeed({
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const progressRef = useRef<NodeJS.Timeout>();
+  const progressRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentReel = reels[currentIndex];
 

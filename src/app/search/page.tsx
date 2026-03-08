@@ -4,21 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import SmartSearchBar from "@/components/ai/SmartSearchBar";
 import BusinessMap from "@/components/maps/BusinessMap";
 import { MapPin, Star, IndianRupee, Filter } from "lucide-react";
-
-interface Business {
-  id: string;
-  name: string;
-  slug: string;
-  category: string;
-  location: string;
-  location_lat: number;
-  location_lng: number;
-  rating: number;
-  review_count?: number;
-  price_range?: string;
-  image_url?: string;
-  distance?: number;
-}
+import { Business } from "@/lib/dataStorage";
 
 export default function SearchPage() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
@@ -54,11 +40,12 @@ export default function SearchPage() {
     return (
       b.name.toLowerCase().includes(q) ||
       b.category.toLowerCase().includes(q) ||
-      (b.location || "").toLowerCase().includes(q)
+      (b.address || "").toLowerCase().includes(q)
     );
   };
 
   const filtered = businesses.filter(matchesQuery);
+  const filteredForMap = filtered.filter(b => b.location_lat && b.location_lng);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 pb-20 md:pb-0">
@@ -111,7 +98,7 @@ export default function SearchPage() {
                         </p>
                         <p className="flex items-center gap-1 text-gray-500 dark:text-gray-400 truncate">
                           <MapPin size={10} />
-                          <span className="truncate">{biz.location}</span>
+                          <span className="truncate">{biz.address}</span>
                         </p>
                       </div>
                       <div className="flex items-center justify-center text-gray-800 dark:text-gray-100">
@@ -150,7 +137,7 @@ export default function SearchPage() {
           {/* Map side */}
           <div className="h-[520px]">
             <BusinessMap
-              businesses={filtered}
+              businesses={filteredForMap as any}
               userLocation={undefined}
               onBusinessSelect={(biz) => setSelectedBusiness(biz as any)}
               height="100%"

@@ -96,11 +96,8 @@ export default function BusinessMap({
       try {
         setIsLoading(true);
         
-        // Dynamic import for Leaflet with timeout
-        const L = await Promise.race([
-          import('leaflet'),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Map loading timeout')), 5000))
-        ]) as any;
+        // Simple dynamic import for Leaflet
+        const L = await import('leaflet');
         
         // Fix Leaflet default markers
         delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -131,11 +128,10 @@ export default function BusinessMap({
           attributionControl: false
         });
 
-        // Add tile layer with caching
+        // Add tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap contributors',
-          maxZoom: 19,
-          className: 'map-tiles'
+          maxZoom: 19
         }).addTo(leafletMap);
 
         // Add attribution separately

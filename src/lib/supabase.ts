@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase configuration
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://business-gallery3.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrb2V6dXVvY2Vjc295Y3JjYWxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MDgzNjUsImV4cCI6MjA4NTA4NDM2NX0.t9cul0YOEsqZUoNXhM0WL7Qix-hbWJ9tt0_5dYep0pc';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -321,11 +321,9 @@ export class SupabaseService {
     
     if (uploadError) throw uploadError;
     
-    const { data: publicUrl, error: urlError } = await supabase.storage
+    const { data: publicUrl } = await supabase.storage
       .from(bucket)
       .getPublicUrl(filePath);
-    
-    if (urlError) throw urlError;
     
     return {
       path: filePath,

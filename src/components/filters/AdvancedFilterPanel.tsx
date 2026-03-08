@@ -91,15 +91,15 @@ export default function AdvancedFilterPanel({ onFilterChange, businesses }: Adva
         </div>
         <div className="flex items-center gap-2">
           {getActiveFiltersCount() > 0 && (
-            <button
+            <span
               onClick={(e) => {
                 e.stopPropagation();
                 clearFilters();
               }}
-              className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 cursor-pointer"
             >
               Clear all
-            </button>
+            </span>
           )}
           <X 
             size={18} 
